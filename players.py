@@ -15,7 +15,7 @@ class Player(ABC):
 
 
 class HumanPlayer(Player):
-    def get_move(self, board: Board) -> None:
+    def get_move(self, board: Board) -> Optional[Tuple[int, int]]:
         return None
 
 
@@ -25,7 +25,10 @@ class AIPlayer(Player):
         self.opponent = HUMAN if symbol == AI_PLAYER else AI_PLAYER
         self.difficulty = difficulty
 
-    def get_move(self, board: Board) -> Tuple[int, int]:
+    def get_move(self, board: Board) -> Optional[Tuple[int, int]]:
+        if not board.get_empty_cells():
+            return None
+
         match self.difficulty:
             case Difficulty.EASY:
                 return self._easy_move(board)
@@ -63,11 +66,11 @@ class AIPlayer(Player):
 
     def _find_winning_move(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
         for r, c in board.get_empty_cells():
-            board.make_move(r, c, player)
-            win = board.check_win(player)
-            board.undo_move(r, c)
-            if win:
-                return (r, c)
+            if board.make_move(r, c, player):
+                win = board.check_win(player)
+                board.undo_move(r, c)
+                if win:
+                    return (r, c)
         return None
 
     def _find_near_move(self, board: Board) -> Tuple[int, int]:
@@ -81,7 +84,8 @@ class AIPlayer(Player):
                             if dr == 0 and dc == 0:
                                 continue
                             nr, nc = r + dr, c + dc
-                            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and board.grid[nr, nc] == EMPTY:
+                            if (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
+                                    board.grid[nr, nc] == EMPTY):
                                 candidates.add((nr, nc))
 
         if candidates:
@@ -102,17 +106,19 @@ class AIPlayer(Player):
                             if dr == 0 and dc == 0:
                                 continue
                             nr, nc = r + dr, c + dc
-                            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
-                                if board.grid[nr, nc] == EMPTY and (nr, nc) not in seen:
-                                    score = self._evaluate_position(board, nr, nc)
-                                    candidates.append(((nr, nc), score))
-                                    seen.add((nr, nc))
+                            if (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
+                                    board.grid[nr, nc] == EMPTY and (nr, nc) not in seen):
+                                score = self._evaluate_position(board, nr, nc)
+                                candidates.append(((nr, nc), score))
+                                seen.add((nr, nc))
 
         return candidates
 
     def _evaluate_position(self, board: Board, r: int, c: int) -> int:
         score = 0
-        board.make_move(r, c, self.symbol)
+
+        if not board.make_move(r, c, self.symbol):
+            return score
 
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for dr, dc in directions:
