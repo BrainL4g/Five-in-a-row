@@ -8,8 +8,9 @@ from constants import BOARD_SIZE, EMPTY
 
 class Board:
     def __init__(self) -> None:
-        self.grid: np.ndarray = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=np.int8)
-        self.last_move: Optional[Tuple[int, int, int]] = None
+        self.grid = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=np.int8)
+        self.last_move = None
+        self.win_line = None
 
     def make_move(self, row: int, col: int, player: int) -> bool:
         if not (0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE):
@@ -24,6 +25,7 @@ class Board:
     def undo_move(self, row: int, col: int) -> None:
         if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE and self.grid[row, col] != EMPTY:
             self.grid[row, col] = EMPTY
+            self.win_line = None
 
     def is_full(self) -> bool:
         return np.all(self.grid != EMPTY)
@@ -36,19 +38,27 @@ class Board:
         if last_player != player:
             return False
 
-        directions: List[Tuple[int, int]] = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        self.win_line = [(r, c)]
 
         for dr, dc in directions:
             count = 1
+            line = [(r, c)]
+
             for sign in (1, -1):
                 nr, nc = r + dr * sign, c + dc * sign
                 while (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
                        self.grid[nr, nc] == player):
                     count += 1
+                    line.append((nr, nc))
                     nr += dr * sign
                     nc += dc * sign
+
             if count >= 5:
+                self.win_line = line
                 return True
+
+        self.win_line = None
         return False
 
     def get_empty_cells(self) -> List[Tuple[int, int]]:
