@@ -1,7 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 import random
-import time
 from typing import Tuple, Optional, List
 from src.constants import BOARD_SIZE, HUMAN, AI_PLAYER, EMPTY, Difficulty
 from src.board import Board
@@ -39,35 +38,26 @@ class MediumStrategy(AIStrategy):
         return self._find_near_move(board)
 
     def _find_winning_move(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
-        for r, c in board.get_empty_cells():
+        for r, c in board.get_near_empty_cells():
             if board.make_move(r, c, player):
-                win = board.check_win(player)
-                board.undo_move(r, c)
-                if win:
+                if board.check_win(player):
+                    board.undo_move(r, c)
                     return (r, c)
+                board.undo_move(r, c)
         return None
 
     def _find_near_move(self, board: Board) -> Tuple[int, int]:
-        candidates = set()
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                if board.grid[r, c] != EMPTY:
-                    for dr in (-1, 0, 1):
-                        for dc in (-1, 0, 1):
-                            if dr == 0 and dc == 0:
-                                continue
-                            nr, nc = r + dr, c + dc
-                            if (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
-                                    board.grid[nr, nc] == EMPTY):
-                                candidates.add((nr, nc))
-        if candidates:
-            return random.choice(list(candidates))
-        empties = board.get_empty_cells()
-        return random.choice(empties) if empties else (7, 7)
+        near = board.get_near_empty_cells()
+        return random.choice(near) if near else random.choice(board.get_empty_cells())
 
 
 class HardStrategy(AIStrategy):
+    def __init__(self):
+        self.eval_cache = {}
+
     def find_move(self, board: Board, symbol: int, opponent: int) -> Tuple[int, int]:
+        self.eval_cache.clear()
+
         if move := self._find_winning_move(board, symbol):
             return move
         if move := self._find_winning_move(board, opponent):
@@ -77,191 +67,158 @@ class HardStrategy(AIStrategy):
         if move := self._find_double_or_critical_three_threat(board, opponent):
             return move
 
-        empty_count = len(board.get_empty_cells())
-        total_moves_made = BOARD_SIZE ** 2 - empty_count
+        total_moves = BOARD_SIZE * BOARD_SIZE - len(board.get_empty_cells())
 
-        if total_moves_made < 6:
+        if total_moves < 8:
             cx, cy = BOARD_SIZE // 2, BOARD_SIZE // 2
-            candidates = []
-            for dr in range(-5, 6):
-                for dc in range(-5, 6):
-                    r, c = cy + dr, cx + dc
-                    if 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE and board.grid[r, c] == EMPTY:
-                        candidates.append((r, c))
-            if candidates:
-                return random.choice(candidates)
+            zone = [(cy + dr, cx + dc) for dr in range(-5, 6) for dc in range(-5, 6)
+                    if
+                    0 <= cy + dr < BOARD_SIZE and 0 <= cx + dc < BOARD_SIZE and board.grid[cy + dr, cx + dc] == EMPTY]
+            return random.choice(zone) if zone else self._find_near_move(board)
 
         candidates = self._get_scoring_candidates(board, symbol)
         if candidates:
-            top_score = candidates[0][1]
-            good_moves = [pos for pos, sc in candidates[:8] if sc >= top_score - 2000]
-            return random.choice(good_moves if good_moves else [candidates[0][0]])
+            top = candidates[0][1]
+            good = [pos for pos, sc in candidates[:10] if sc >= top - 3000]
+            return random.choice(good)
 
         return self._find_near_move(board)
 
     def _find_winning_move(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
-        candidates = self._get_potential_threat_cells(board)
-        for r, c in candidates:
+        for r, c in board.get_near_empty_cells():
             if board.make_move(r, c, player):
-                win = board.check_win(player)
-                board.undo_move(r, c)
-                if win:
+                if board.check_win(player):
+                    board.undo_move(r, c)
                     return (r, c)
+                board.undo_move(r, c)
         return None
 
     def _find_double_open_four_threat(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
-        threats = []
-        candidates = self._get_potential_threat_cells(board)
-        for r, c in candidates:
+        for r, c in board.get_near_empty_cells():
             if board.make_move(r, c, player):
-                count = self._count_open_patterns_after_move(board, r, c, player, 4)
+                if self._count_open_fours(board, player) >= 2:
+                    board.undo_move(r, c)
+                    return (r, c)
                 board.undo_move(r, c)
-                if count >= 2:
-                    threats.append((r, c))
-        if threats:
-            return random.choice(threats)
         return None
 
     def _find_double_or_critical_three_threat(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
-        threats = []
-        candidates = self._get_potential_threat_cells(board)
-        for r, c in candidates:
+        for r, c in board.get_near_empty_cells():
             if board.make_move(r, c, player):
-                count = self._count_open_patterns_after_move(board, r, c, player, 3)
+                threes = self._count_open_threes(board, player)
                 board.undo_move(r, c)
-                if count >= 2:
-                    threats.append((r, c))
-                elif count >= 1:
-                    threats.append((r, c))
-        if threats:
-            return random.choice(threats)
+                if threes >= 2 or threes >= 1:
+                    return (r, c)
         return None
 
-    def _count_open_patterns_after_move(self, board: Board, r: int, c: int, player: int, target_length: int) -> int:
+    def _count_open_fours(self, board: Board, player: int) -> int:
         count = 0
-        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-        for dr, dc in directions:
-            stones = 1
-            open_ends = 0
-            for sign in (1, -1):
-                nr, nc = r + dr * sign, c + dc * sign
-                while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
-                    if board.grid[nr, nc] == player:
-                        stones += 1
-                    elif board.grid[nr, nc] == EMPTY:
-                        open_ends += 1
-                        break
-                    else:
-                        break
-                    nr += dr * sign
-                    nc += dc * sign
-            if stones == target_length and open_ends >= 2:
-                count += 1
-        return count
-
-    def _get_potential_threat_cells(self, board: Board) -> List[Tuple[int, int]]:
-        candidates = set()
+        dirs = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
-                if board.grid[r, c] != EMPTY:
-                    for dr in range(-3, 4):
-                        for dc in range(-3, 4):
-                            if dr == 0 and dc == 0:
-                                continue
-                            nr, nc = r + dr, c + dc
-                            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and board.grid[nr, nc] == EMPTY:
-                                candidates.add((nr, nc))
-        return list(candidates)
+                if board.grid[r, c] == player:
+                    for dr, dc in dirs:
+                        stones, opens = self._line_info(board, r, c, dr, dc, player)
+                        if stones == 4 and opens >= 2:
+                            count += 1
+        return count // 2
+
+    def _count_open_threes(self, board: Board, player: int) -> int:
+        count = 0
+        dirs = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for r in range(BOARD_SIZE):
+            for c in range(BOARD_SIZE):
+                if board.grid[r, c] == player:
+                    for dr, dc in dirs:
+                        stones, opens = self._line_info(board, r, c, dr, dc, player)
+                        if stones == 3 and opens >= 2:
+                            count += 1
+        return count // 2
+
+    def _line_info(self, board: Board, r: int, c: int, dr: int, dc: int, player: int) -> Tuple[int, int]:
+        stones = 1
+        opens = 0
+        for s in (1, -1):
+            nr, nc = r + dr * s, c + dc * s
+            while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
+                if board.grid[nr, nc] == player:
+                    stones += 1
+                elif board.grid[nr, nc] == EMPTY:
+                    opens += 1
+                    break
+                else:
+                    break
+                nr += dr * s
+                nc += dc * s
+        return stones, opens
 
     def _find_near_move(self, board: Board) -> Tuple[int, int]:
-        candidates = set()
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                if board.grid[r, c] != EMPTY:
-                    for dr in (-1, 0, 1):
-                        for dc in (-1, 0, 1):
-                            if dr == 0 and dc == 0:
-                                continue
-                            nr, nc = r + dr, c + dc
-                            if (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
-                                    board.grid[nr, nc] == EMPTY):
-                                candidates.add((nr, nc))
-        if candidates:
-            return random.choice(list(candidates))
-        empties = board.get_empty_cells()
-        return random.choice(empties) if empties else (7, 7)
+        near = board.get_near_empty_cells()
+        return random.choice(near) if near else random.choice(board.get_empty_cells())
 
     def _get_scoring_candidates(self, board: Board, symbol: int) -> List[Tuple[Tuple[int, int], int]]:
         candidates = []
         seen = set()
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                if board.grid[r, c] != EMPTY:
-                    for dr in range(-3, 4):
-                        for dc in range(-3, 4):
-                            if dr == 0 and dc == 0:
-                                continue
-                            nr, nc = r + dr, c + dc
-                            if (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
-                                    board.grid[nr, nc] == EMPTY and (nr, nc) not in seen):
-                                score = self._evaluate_position(board, nr, nc, symbol)
-                                candidates.append(((nr, nc), score))
-                                seen.add((nr, nc))
+        for r, c in board.get_near_empty_cells():
+            if (r, c) in seen:
+                continue
+            seen.add((r, c))
+            score = self._evaluate_position(board, r, c, symbol)
+            candidates.append(((r, c), score))
         candidates.sort(key=lambda x: x[1], reverse=True)
-        return candidates[:24]
+        return candidates[:20]
 
     def _evaluate_position(self, board: Board, r: int, c: int, symbol: int) -> int:
+        key = (r, c, symbol)
+        if key in self.eval_cache:
+            return self.eval_cache[key]
+
         if not board.make_move(r, c, symbol):
             return -999999
+
         score = 0
-        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-        for dr, dc in directions:
+        dirs = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for dr, dc in dirs:
             stones = 1
-            open_ends = 0
-            for sign in (1, -1):
-                nr, nc = r + dr * sign, c + dc * sign
+            opens = 0
+            for s in (1, -1):
+                nr, nc = r + dr * s, c + dc * s
                 while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
-                    if board.grid[nr, nc] == symbol:
+                    cell = board.grid[nr, nc]
+                    if cell == symbol:
                         stones += 1
-                    elif board.grid[nr, nc] == EMPTY:
-                        open_ends += 1
+                    elif cell == EMPTY:
+                        opens += 1
                         break
                     else:
                         break
-                    nr += dr * sign
-                    nc += dc * sign
+                    nr += dr * s
+                    nc += dc * s
             if stones >= 5:
                 score += 1000000
             elif stones == 4:
-                score += 50000 if open_ends >= 2 else 8000
+                score += 60000 if opens >= 2 else 10000
             elif stones == 3:
-                score += 2500 if open_ends >= 2 else 400
+                score += 8000 if opens >= 2 else 800
             elif stones == 2:
-                score += 180 if open_ends == 2 else 30
+                score += 300 if opens == 2 else 50
+
         board.undo_move(r, c)
+        self.eval_cache[key] = score
         return score
 
 
 class AIPlayer(Player):
     def __init__(self, symbol: int, difficulty: Difficulty):
         self.symbol = symbol
-        self.opponent = HUMAN if symbol == AI_PLAYER else AI_PLAYER
+        self.opponent = HUMAN if symbol == AI_PLAYER else HUMAN
         self.strategy = self._get_strategy(difficulty)
 
     def _get_strategy(self, difficulty: Difficulty) -> AIStrategy:
-        match difficulty:
-            case Difficulty.EASY:
-                return EasyStrategy()
-            case Difficulty.MEDIUM:
-                return MediumStrategy()
-            case Difficulty.HARD:
-                return HardStrategy()
-            case _:
-                return EasyStrategy()
+        return {Difficulty.EASY: EasyStrategy(), Difficulty.MEDIUM: MediumStrategy(),
+                Difficulty.HARD: HardStrategy()}.get(difficulty, EasyStrategy())
 
     def get_move(self, board: Board) -> Optional[Tuple[int, int]]:
-        empties = board.get_empty_cells()
-        if not empties:
+        if not board.get_empty_cells():
             return None
-        time.sleep(0.1)
         return self.strategy.find_move(board, self.symbol, self.opponent)
