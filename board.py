@@ -22,9 +22,8 @@ class Board:
         return True
 
     def undo_move(self, row: int, col: int) -> None:
-        if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE:
+        if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE and self.grid[row, col] != EMPTY:
             self.grid[row, col] = EMPTY
-            self.last_move = None
 
     def is_full(self) -> bool:
         return np.all(self.grid != EMPTY)
@@ -32,7 +31,10 @@ class Board:
     def check_win(self, player: int) -> bool:
         if self.last_move is None:
             return False
-        r, c, _ = self.last_move
+        r, c, last_player = self.last_move
+
+        if last_player != player:
+            return False
 
         directions: List[Tuple[int, int]] = [(0, 1), (1, 0), (1, 1), (1, -1)]
 
@@ -40,11 +42,8 @@ class Board:
             count = 1
             for sign in (1, -1):
                 nr, nc = r + dr * sign, c + dc * sign
-                while (
-                    0 <= nr < BOARD_SIZE
-                    and 0 <= nc < BOARD_SIZE
-                    and self.grid[nr, nc] == player
-                ):
+                while (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
+                       self.grid[nr, nc] == player):
                     count += 1
                     nr += dr * sign
                     nc += dc * sign
