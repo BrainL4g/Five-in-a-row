@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 from constants import *
 from board import Board
-from players import HumanPlayer, AIPlayer, Player
+from players import HumanPlayer, AIPlayer
 from renderer import Renderer
 
 
@@ -20,35 +20,18 @@ class Game:
         self.game_over: bool = False
         self.winner: Optional[int] = None
         self.difficulty: Difficulty = Difficulty.MEDIUM
+        self.last_hovered: Optional[Tuple[int, int]] = None
 
     def run(self) -> None:
         running = True
-        hovered: Optional[Tuple[int, int]] = None
 
         while running:
             mouse_pos = pygame.mouse.get_pos()
+            hovered = None
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-
-                elif event.type == pygame.MOUSEBUTTONDOWN and not self.game_over:
-                    if self.current_player == HUMAN:
-                        col = event.pos[0] // CELL_SIZE
-                        row = event.pos[1] // CELL_SIZE
-                        if row < BOARD_SIZE and col < BOARD_SIZE:
-                            if self.board.make_move(row, col, HUMAN):
-                                self._after_move(HUMAN)
-
-                    if self.renderer.btn_new_game["rect"].collidepoint(event.pos):
-                        self.reset_game()
-
-                    if self.renderer.btn_easy["rect"].collidepoint(event.pos):
-                        self.set_difficulty(Difficulty.EASY)
-                    if self.renderer.btn_medium["rect"].collidepoint(event.pos):
-                        self.set_difficulty(Difficulty.MEDIUM)
-                    if self.renderer.btn_hard["rect"].collidepoint(event.pos):
-                        self.set_difficulty(Difficulty.HARD)
 
                 elif event.type == pygame.MOUSEMOTION:
                     col = event.pos[0] // CELL_SIZE
@@ -58,15 +41,33 @@ class Game:
                     else:
                         hovered = None
 
-            if self.current_player == AI_PLAYER and not self.game_over:
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    col = event.pos[0] // CELL_SIZE
+                    row = event.pos[1] // CELL_SIZE
+
+                    if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE:
+                        if not self.game_over and self.current_player == HUMAN:
+                            if self.board.make_move(row, col, HUMAN):
+                                self._after_move(HUMAN)
+
+                    elif self.renderer.btn_new_game["rect"].collidepoint(event.pos):
+                        self.reset_game()
+
+                    elif self.renderer.btn_easy["rect"].collidepoint(event.pos):
+                        self.set_difficulty(Difficulty.EASY)
+                    elif self.renderer.btn_medium["rect"].collidepoint(event.pos):
+                        self.set_difficulty(Difficulty.MEDIUM)
+                    elif self.renderer.btn_hard["rect"].collidepoint(event.pos):
+                        self.set_difficulty(Difficulty.HARD)
+
+            if not self.game_over and self.current_player == AI_PLAYER:
                 move = self.ai.get_move(self.board)
                 if move:
                     r, c = move
-                    self.board.make_move(r, c, AI_PLAYER)
-                    self._after_move(AI_PLAYER)
+                    if self.board.make_move(r, c, AI_PLAYER):
+                        self._after_move(AI_PLAYER)
 
             status = self._get_status_text()
-
             self.renderer.draw_board(self.board, hovered)
             self.renderer.draw_ui(status, self.difficulty, mouse_pos)
             self.renderer.update()
@@ -97,6 +98,7 @@ class Game:
         self.current_player = HUMAN
         self.game_over = False
         self.winner = None
+        self.last_hovered = None
 
     def set_difficulty(self, diff: Difficulty) -> None:
         if self.game_over or self.current_player == AI_PLAYER:
