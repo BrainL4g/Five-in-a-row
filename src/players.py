@@ -123,19 +123,24 @@ class HardStrategy(AIStrategy):
         return candidates
 
     def _evaluate_position(self, board: Board, r: int, c: int, symbol: int) -> int:
-        score = 0
         if not board.make_move(r, c, symbol):
-            return score
+            return -999999
+
+        score = 0
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+
         for dr, dc in directions:
-            count = 1
+            line_cells = [(r, c)]
+            stones = 1
             open_ends = 0
+
             for sign in (1, -1):
                 nr, nc = r + dr * sign, c + dc * sign
-                steps = 1
+                consecutive = 0
                 while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
                     if board.grid[nr, nc] == symbol:
-                        count += 1
+                        consecutive += 1
+                        line_cells.append((nr, nc))
                     elif board.grid[nr, nc] == EMPTY:
                         open_ends += 1
                         break
@@ -143,15 +148,23 @@ class HardStrategy(AIStrategy):
                         break
                     nr += dr * sign
                     nc += dc * sign
-                    steps += 1
-                    if steps > 6:
-                        break
-            if count >= 4:
-                score += 10000
-            elif count == 3:
-                score += 500 if open_ends >= 2 else 200
-            elif count == 2:
-                score += 50 if open_ends == 2 else 10
+
+                stones += consecutive
+
+            if stones >= 5:
+                score += 1_000_000
+            elif stones == 4:
+                score += 50_000 if open_ends >= 2 else 8_000
+            elif stones == 3:
+                score += 2_500 if open_ends >= 2 else 400
+            elif stones == 2:
+                score += 180 if open_ends == 2 else 30
+            elif stones == 1:
+                score += 10 if open_ends == 2 else 2
+
+            if open_ends == 0 and stones >= 3:
+                score -= 3000
+
         board.undo_move(r, c)
         return score
 
