@@ -4,7 +4,7 @@ import time
 from typing import Optional, Tuple, Dict
 from src.constants import *
 from src.board import Board
-from src.players import HumanPlayer, AIPlayer
+from src.players import HumanPlayer, AIPlayer, HardStrategy
 from src.renderer import Renderer
 from src.menu import Menu
 from src.settings import Settings
@@ -24,6 +24,7 @@ class Game:
         self.winner = None
         self.ai_thinking = False
         self.ai_move_time = 0
+        self.moves = []
 
     def run(self) -> None:
         running = True
@@ -65,6 +66,7 @@ class Game:
                         if hovered:
                             if not self.game_over and self.current_player == HUMAN:
                                 if self.board.make_move(hovered[0], hovered[1], HUMAN):
+                                    self.moves.append((hovered[0], hovered[1], HUMAN))
                                     self._after_move(HUMAN)
                         ui_btn_rect = pygame.Rect(WINDOW_WIDTH // 2 - 70,
                                                   GRID_OFFSET_Y + BOARD_SIZE * CELL_SIZE + 50,
@@ -80,6 +82,7 @@ class Game:
                 if move:
                     r, c = move
                     if self.board.make_move(r, c, AI_PLAYER):
+                        self.moves.append((r, c, AI_PLAYER))
                         last_move_time = current_time
                         self._after_move(AI_PLAYER)
                 self.ai_thinking = False
@@ -92,6 +95,7 @@ class Game:
                 status = self._get_status_text()
                 self.renderer.draw_ui(status, self.settings.get_difficulty(), mouse_pos, self.game_over)
             self.renderer.update()
+            pygame.time.delay(10)
         self.renderer.close()
 
     def _get_hovered_cell(self, mouse_pos) -> Optional[Tuple[int, int]]:
@@ -114,6 +118,10 @@ class Game:
         else:
             self.current_player = AI_PLAYER if player == HUMAN else HUMAN
 
+        if self.game_over and self.settings.get_difficulty() == Difficulty.HARD:
+            if isinstance(self.ai.strategy, HardStrategy):
+                self.ai.strategy.save_learning_data(self.moves, self.winner)
+
     def _get_status_text(self) -> str:
         if self.ai_thinking:
             return "Компьютер думает..."
@@ -131,3 +139,4 @@ class Game:
         self.game_over = False
         self.winner = None
         self.ai_thinking = False
+        self.moves = []
