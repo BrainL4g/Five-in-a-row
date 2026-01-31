@@ -117,16 +117,18 @@ class HardStrategy(AIStrategy):
 
         best_score = -float('inf')
         best_move = None
-        candidates = board.get_near_empty_cells()
+        candidates = board.get_near_empty_cells()[:40]
         if not candidates:
             candidates = board.get_empty_cells()[:60]
+
         for r, c in candidates:
             board.make_move(r, c, symbol)
-            score = -self._minimax(board, 5, False, -float('inf'), float('inf'), opponent, symbol)
+            score = -self._minimax(board, 4, False, -float('inf'), float('inf'), opponent, symbol)
             board.undo_move(r, c)
             if score > best_score:
                 best_score = score
                 best_move = (r, c)
+
         return best_move or random.choice(candidates)
 
     def _minimax(self, board: Board, depth: int, maximizing: bool, alpha: float, beta: float, player: int,
@@ -139,7 +141,9 @@ class HardStrategy(AIStrategy):
             return 1000000 if maximizing else -1000000
         if board.is_full() or depth == 0:
             return self._evaluate(board, player, opponent)
+
         candidates = board.get_near_empty_cells() or board.get_empty_cells()[:40]
+
         if maximizing:
             max_eval = -float('inf')
             for r, c in candidates:
@@ -276,73 +280,6 @@ class HardStrategy(AIStrategy):
     def _find_near_move(self, board: Board) -> Tuple[int, int]:
         near = board.get_near_empty_cells()
         return random.choice(near) if near else random.choice(board.get_empty_cells())
-
-    def _get_scoring_candidates(self, board: Board, symbol: int) -> List[Tuple[Tuple[int, int], int]]:
-        candidates = []
-        seen = set()
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                if board.grid[r, c] != EMPTY:
-                    for dr in range(-3, 4):
-                        for dc in range(-3, 4):
-                            if dr == 0 and dc == 0:
-                                continue
-                            nr, nc = r + dr, c + dc
-                            if (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
-                                    board.grid[nr, nc] == EMPTY and (nr, nc) not in seen):
-                                score = self._evaluate_position(board, nr, nc, symbol)
-                                candidates.append(((nr, nc), score))
-                                seen.add((nr, nc))
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        return candidates[:12]
-
-    def _evaluate_position(self, board: Board, r: int, c: int, symbol: int) -> int:
-        key = (r, c, symbol)
-        if key in self.eval_cache:
-            return self.eval_cache[key]
-
-        if not board.make_move(r, c, symbol):
-            return -999999
-
-        score = 0
-        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-        for dr, dc in directions:
-            stones = 1
-            open_ends = 0
-            for sign in (1, -1):
-                nr, nc = r + dr * sign, c + dc * sign
-                while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
-                    if board.grid[nr, nc] == symbol:
-                        stones += 1
-                    elif board.grid[nr, nc] == EMPTY:
-                        open_ends += 1
-                        break
-                    else:
-                        break
-                    nr += dr * sign
-                    nc += dc * sign
-            if stones >= 5:
-                score += 1000000
-            elif stones == 4:
-                score += 50000 if open_ends >= 2 else 8000
-            elif stones == 3:
-                score += 2500 if open_ends >= 2 else 400
-            elif stones == 2:
-                score += 180 if open_ends == 2 else 30
-
-        board.undo_move(r, c)
-
-        current_hash = board.get_hash()
-        move_key = f"{r},{c}"
-        bonus = 0
-        if current_hash in self.good_moves and move_key in self.good_moves[current_hash]:
-            bonus += self.good_moves[current_hash][move_key]
-        if current_hash in self.bad_moves and move_key in self.bad_moves[current_hash]:
-            bonus += self.bad_moves[current_hash][move_key]
-        score += bonus
-
-        self.eval_cache[key] = score
-        return score
 
 
 class AIPlayer(Player):
