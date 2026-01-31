@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 import random
 import time
 from typing import Tuple, Optional, List
-from constants import BOARD_SIZE, HUMAN, AI_PLAYER, EMPTY, Difficulty
-from board import Board
+from src.constants import BOARD_SIZE, HUMAN, AI_PLAYER, EMPTY, Difficulty
+from src.board import Board
 
 
 class Player(ABC):

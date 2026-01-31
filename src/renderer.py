@@ -2,8 +2,8 @@ from __future__ import annotations
 import pygame
 from pygame import Surface, Rect
 from typing import Optional, Tuple
-from constants import *
-from board import Board
+from src.constants import *
+from src.board import Board
 
 
 class Renderer:

@@ -2,12 +2,12 @@ from __future__ import annotations
 import pygame
 import time
 from typing import Optional, Tuple, Dict
-from constants import *
-from board import Board
-from players import HumanPlayer, AIPlayer
-from renderer import Renderer
-from menu import Menu
-from settings import Settings
+from src.constants import *
+from src.board import Board
+from src.players import HumanPlayer, AIPlayer
+from src.renderer import Renderer
+from src.menu import Menu
+from src.settings import Settings
 
 
 class Game:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 from typing import Tuple, Optional, List
-from constants import BOARD_SIZE, EMPTY
+from src.constants import BOARD_SIZE, EMPTY
 
 
 class Board:

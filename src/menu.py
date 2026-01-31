@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pygame
 from typing import Dict, Any
-from constants import WINDOW_WIDTH, WINDOW_HEIGHT, Difficulty, VisualStyle
+from src.constants import WINDOW_WIDTH, WINDOW_HEIGHT, Difficulty, VisualStyle
 
 
 class Menu:
