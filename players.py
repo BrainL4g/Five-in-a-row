@@ -25,11 +25,10 @@ class AIPlayer(Player):
         self.difficulty = difficulty
 
     def get_move(self, board: Board) -> Optional[Tuple[int, int]]:
-        if not board.get_empty_cells():
+        empties = board.get_empty_cells()
+        if not empties:
             return None
-
-        time.sleep(0.5)
-
+        time.sleep(0.3)
         match self.difficulty:
             case Difficulty.EASY:
                 return self._easy_move(board)
@@ -40,27 +39,25 @@ class AIPlayer(Player):
             case _:
                 return self._easy_move(board)
 
-    def _easy_move(self, board: Board) -> Optional[Tuple[int, int]]:
+    def _easy_move(self, board: Board) -> Tuple[int, int]:
         empties = board.get_empty_cells()
         return random.choice(empties) if empties else (7, 7)
 
-    def _medium_move(self, board: Board) -> Optional[Tuple[int, int]]:
+    def _medium_move(self, board: Board) -> Tuple[int, int]:
         if move := self._find_winning_move(board, self.symbol):
             return move
         if move := self._find_winning_move(board, self.opponent):
             return move
         return self._find_near_move(board)
 
-    def _hard_move(self, board: Board) -> Optional[Tuple[int, int]]:
+    def _hard_move(self, board: Board) -> Tuple[int, int]:
         if move := self._find_winning_move(board, self.symbol):
             return move
         if move := self._find_winning_move(board, self.opponent):
             return move
-
         candidates = self._get_scoring_candidates(board)
         if candidates:
             return max(candidates, key=lambda x: x[1])[0]
-
         return self._find_near_move(board)
 
     def _find_winning_move(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
@@ -72,9 +69,8 @@ class AIPlayer(Player):
                     return (r, c)
         return None
 
-    def _find_near_move(self, board: Board) -> Optional[Tuple[int, int]]:
+    def _find_near_move(self, board: Board) -> Tuple[int, int]:
         candidates = set()
-
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
                 if board.grid[r, c] != EMPTY:
@@ -86,17 +82,14 @@ class AIPlayer(Player):
                             if (0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and
                                     board.grid[nr, nc] == EMPTY):
                                 candidates.add((nr, nc))
-
         if candidates:
             return random.choice(list(candidates))
-
         empties = board.get_empty_cells()
         return random.choice(empties) if empties else (7, 7)
 
     def _get_scoring_candidates(self, board: Board) -> List[Tuple[Tuple[int, int], int]]:
         candidates = []
         seen = set()
-
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
                 if board.grid[r, c] != EMPTY:
@@ -110,20 +103,16 @@ class AIPlayer(Player):
                                 score = self._evaluate_position(board, nr, nc)
                                 candidates.append(((nr, nc), score))
                                 seen.add((nr, nc))
-
         return candidates
 
     def _evaluate_position(self, board: Board, r: int, c: int) -> int:
         score = 0
-
         if not board.make_move(r, c, self.symbol):
             return score
-
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         for dr, dc in directions:
             count = 1
             open_ends = 0
-
             for sign in (1, -1):
                 nr, nc = r + dr * sign, c + dc * sign
                 steps = 1
@@ -140,13 +129,11 @@ class AIPlayer(Player):
                     steps += 1
                     if steps > 6:
                         break
-
             if count >= 4:
                 score += 10000
             elif count == 3:
                 score += 500 if open_ends >= 2 else 200
             elif count == 2:
                 score += 50 if open_ends == 2 else 10
-
         board.undo_move(r, c)
         return score
