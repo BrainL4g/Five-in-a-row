@@ -2,6 +2,8 @@ from __future__ import annotations
 import numpy as np
 from typing import Tuple, Optional, List
 from src.constants import BOARD_SIZE, EMPTY
+import json
+import hashlib
 
 
 class Board:
@@ -77,3 +79,6 @@ class Board:
 
         self._near_cache = list(seen)
         return self._near_cache if self._near_cache else self.get_empty_cells()
+
+    def get_hash(self) -> str:
+        return hashlib.sha256(json.dumps(self.grid.tolist()).encode()).hexdigest()
