@@ -57,9 +57,10 @@ class MediumStrategy(AIStrategy):
 class HardStrategy(AIStrategy):
     def __init__(self):
         os.makedirs('data', exist_ok=True)
-        self.good_moves: Dict[str, Dict[str, int]] = self._load_data('data/good_moves.json')
-        self.bad_moves: Dict[str, Dict[str, int]] = self._load_data('data/bad_moves.json')
+        self.good_moves = self._load_data('data/good_moves.json')
+        self.bad_moves = self._load_data('data/bad_moves.json')
         self.eval_cache = {}
+        self.trans_table = {}
 
     def _load_data(self, filepath: str) -> Dict[str, Dict[str, int]]:
         if os.path.exists(filepath):
@@ -94,6 +95,7 @@ class HardStrategy(AIStrategy):
 
     def find_move(self, board: Board, symbol: int, opponent: int) -> Tuple[int, int]:
         self.eval_cache.clear()
+        self.trans_table.clear()
 
         if move := self._find_winning_move(board, symbol):
             return move
@@ -113,13 +115,95 @@ class HardStrategy(AIStrategy):
                     0 <= cy + dr < BOARD_SIZE and 0 <= cx + dc < BOARD_SIZE and board.grid[cy + dr, cx + dc] == EMPTY]
             return random.choice(zone) if zone else self._find_near_move(board)
 
-        candidates = self._get_scoring_candidates(board, symbol)
-        if candidates:
-            top = candidates[0][1]
-            good = [pos for pos, sc in candidates[:10] if sc >= top - 3000]
-            return random.choice(good)
+        best_score = -float('inf')
+        best_move = None
+        candidates = board.get_near_empty_cells()
+        if not candidates:
+            candidates = board.get_empty_cells()[:60]
+        for r, c in candidates:
+            board.make_move(r, c, symbol)
+            score = -self._minimax(board, 5, False, -float('inf'), float('inf'), opponent, symbol)
+            board.undo_move(r, c)
+            if score > best_score:
+                best_score = score
+                best_move = (r, c)
+        return best_move or random.choice(candidates)
 
-        return self._find_near_move(board)
+    def _minimax(self, board: Board, depth: int, maximizing: bool, alpha: float, beta: float, player: int,
+                 opponent: int) -> float:
+        hash_key = board.get_hash() + str(depth) + str(maximizing)
+        if hash_key in self.trans_table:
+            return self.trans_table[hash_key]
+
+        if board.check_win(player if not maximizing else opponent):
+            return 1000000 if maximizing else -1000000
+        if board.is_full() or depth == 0:
+            return self._evaluate(board, player, opponent)
+        candidates = board.get_near_empty_cells() or board.get_empty_cells()[:40]
+        if maximizing:
+            max_eval = -float('inf')
+            for r, c in candidates:
+                board.make_move(r, c, player)
+                eval = self._minimax(board, depth - 1, False, alpha, beta, player, opponent)
+                board.undo_move(r, c)
+                max_eval = max(max_eval, eval)
+                alpha = max(alpha, eval)
+                if beta <= alpha:
+                    break
+            self.trans_table[hash_key] = max_eval
+            return max_eval
+        else:
+            min_eval = float('inf')
+            for r, c in candidates:
+                board.make_move(r, c, opponent)
+                eval = self._minimax(board, depth - 1, True, alpha, beta, player, opponent)
+                board.undo_move(r, c)
+                min_eval = min(min_eval, eval)
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    break
+            self.trans_table[hash_key] = min_eval
+            return min_eval
+
+    def _evaluate(self, board: Board, symbol: int, opponent: int) -> int:
+        score_me = self._eval_player(board, symbol)
+        score_opp = self._eval_player(board, opponent)
+        return score_me - score_opp * 1.15
+
+    def _eval_player(self, board: Board, p: int) -> int:
+        score = 0
+        dirs = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for r in range(BOARD_SIZE):
+            for c in range(BOARD_SIZE):
+                if board.grid[r, c] == p:
+                    for dr, dc in dirs:
+                        cnt, open_ends = self._count_line(board, r, c, dr, dc, p)
+                        if cnt >= 5:
+                            score += 1000000
+                        elif cnt == 4:
+                            score += 80000 if open_ends >= 2 else 15000
+                        elif cnt == 3:
+                            score += 12000 if open_ends >= 2 else 1500
+                        elif cnt == 2:
+                            score += 800 if open_ends == 2 else 100
+        return score
+
+    def _count_line(self, board: Board, r: int, c: int, dr: int, dc: int, p: int) -> Tuple[int, int]:
+        cnt = 1
+        open_ends = 0
+        for s in (1, -1):
+            nr, nc = r + dr * s, c + dc * s
+            while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
+                if board.grid[nr, nc] == p:
+                    cnt += 1
+                elif board.grid[nr, nc] == EMPTY:
+                    open_ends += 1
+                    break
+                else:
+                    break
+                nr += dr * s
+                nc += dc * s
+        return cnt, open_ends
 
     def _find_winning_move(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
         for r, c in board.get_near_empty_cells():
