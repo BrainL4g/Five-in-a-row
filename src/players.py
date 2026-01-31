@@ -60,6 +60,14 @@ class HardStrategy(AIStrategy):
         self.good_moves = self._load_data('data/good_moves.json')
         self.bad_moves = self._load_data('data/bad_moves.json')
         self.eval_cache = {}
+        self._limit_data_size(self.good_moves)
+        self._limit_data_size(self.bad_moves)
+
+    def _limit_data_size(self, data: Dict):
+        if len(data) > 5000:
+            keys = sorted(data.keys())[:len(data) - 3000]
+            for key in keys:
+                del data[key]
 
     def _load_data(self, filepath: str) -> Dict[str, Dict[str, int]]:
         if os.path.exists(filepath):
@@ -68,22 +76,33 @@ class HardStrategy(AIStrategy):
         return {}
 
     def save_learning_data(self, moves: List[Tuple[int, int, int]], winner: int):
-        if winner == AI_PLAYER:
-            data = self.good_moves
-            bonus = 5000
-        else:
-            data = self.bad_moves
-            bonus = -3000
+        if winner not in (AI_PLAYER, HUMAN):
+            return
+
+        data = self.good_moves if winner == AI_PLAYER else self.bad_moves
+        bonus = 10 if winner == AI_PLAYER else -10
 
         temp_board = Board()
-        for row, col, player in moves:
+        seen_hashes = set()
+
+        for i, (row, col, player) in enumerate(moves):
             current_hash = temp_board.get_hash()
+            if current_hash in seen_hashes:
+                continue
+            seen_hashes.add(current_hash)
+
             move_key = f"{row},{col}"
             if player == AI_PLAYER:
                 if current_hash not in data:
                     data[current_hash] = {}
                 data[current_hash][move_key] = data[current_hash].get(move_key, 0) + bonus
+
             temp_board.make_move(row, col, player)
+
+        if len(data) > 3000:
+            oldest_keys = sorted(data.keys())[:len(data) - 2000]
+            for key in oldest_keys:
+                del data[key]
 
         filepath = 'data/good_moves.json' if winner == AI_PLAYER else 'data/bad_moves.json'
         with open(filepath, 'w') as f:
@@ -237,9 +256,9 @@ class HardStrategy(AIStrategy):
         move_key = f"{r},{c}"
         bonus = 0
         if current_hash in self.good_moves and move_key in self.good_moves[current_hash]:
-            bonus += self.good_moves[current_hash][move_key]
+            bonus += min(self.good_moves[current_hash][move_key], 100)
         if current_hash in self.bad_moves and move_key in self.bad_moves[current_hash]:
-            bonus += self.bad_moves[current_hash][move_key]
+            bonus += max(self.bad_moves[current_hash][move_key], -100)
         score += bonus
 
         self.eval_cache[key] = score
