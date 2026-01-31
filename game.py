@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 
 from constants import *
 from board import Board
-from player import HumanPlayer, AIPlayer
+from players import HumanPlayer, AIPlayer, Player
 from renderer import Renderer
 
 
@@ -36,27 +36,27 @@ class Game:
                     if self.current_player == HUMAN:
                         col = event.pos[0] // CELL_SIZE
                         row = event.pos[1] // CELL_SIZE
-                        if self.board.make_move(row, col, HUMAN):
-                            self._after_move(HUMAN)
+                        if row < BOARD_SIZE and col < BOARD_SIZE:
+                            if self.board.make_move(row, col, HUMAN):
+                                self._after_move(HUMAN)
 
-                    if self.btn_new_game["rect"].collidepoint(event.pos):
+                    if self.renderer.btn_new_game["rect"].collidepoint(event.pos):
                         self.reset_game()
 
-                    if self.btn_easy["rect"].collidepoint(event.pos):
+                    if self.renderer.btn_easy["rect"].collidepoint(event.pos):
                         self.set_difficulty(Difficulty.EASY)
-                    if self.btn_medium["rect"].collidepoint(event.pos):
+                    if self.renderer.btn_medium["rect"].collidepoint(event.pos):
                         self.set_difficulty(Difficulty.MEDIUM)
-                    if self.btn_hard["rect"].collidepoint(event.pos):
+                    if self.renderer.btn_hard["rect"].collidepoint(event.pos):
                         self.set_difficulty(Difficulty.HARD)
 
                 elif event.type == pygame.MOUSEMOTION:
                     col = event.pos[0] // CELL_SIZE
                     row = event.pos[1] // CELL_SIZE
-                    hovered = (
-                        (row, col)
-                        if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE
-                        else None
-                    )
+                    if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE:
+                        hovered = (row, col)
+                    else:
+                        hovered = None
 
             if self.current_player == AI_PLAYER and not self.game_over:
                 move = self.ai.get_move(self.board)
