@@ -76,9 +76,27 @@ class HardStrategy(AIStrategy):
             return move
         if move := self._find_double_or_critical_three_threat(board, opponent):
             return move
+
+        empty_count = len(board.get_empty_cells())
+        total_moves_made = BOARD_SIZE ** 2 - empty_count
+
+        if total_moves_made < 6:
+            cx, cy = BOARD_SIZE // 2, BOARD_SIZE // 2
+            candidates = []
+            for dr in range(-5, 6):
+                for dc in range(-5, 6):
+                    r, c = cy + dr, cx + dc
+                    if 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE and board.grid[r, c] == EMPTY:
+                        candidates.append((r, c))
+            if candidates:
+                return random.choice(candidates)
+
         candidates = self._get_scoring_candidates(board, symbol)
         if candidates:
-            return max(candidates, key=lambda x: x[1])[0]
+            top_score = candidates[0][1]
+            good_moves = [pos for pos, sc in candidates[:8] if sc >= top_score - 2000]
+            return random.choice(good_moves)
+
         return self._find_near_move(board)
 
     def _find_winning_move(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
