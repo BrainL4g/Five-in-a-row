@@ -92,7 +92,6 @@ class Game:
                 status = self._get_status_text()
                 self.renderer.draw_ui(status, self.settings.get_difficulty(), mouse_pos, self.game_over)
             self.renderer.update()
-            pygame.time.delay(10)
         self.renderer.close()
 
     def _get_hovered_cell(self, mouse_pos) -> Optional[Tuple[int, int]]:
