@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import random
 from typing import Tuple, Optional, List
 
-from constants import HUMAN, AI_PLAYER, EMPTY, Difficulty
+from constants import BOARD_SIZE, HUMAN, AI_PLAYER, EMPTY, Difficulty
 from board import Board
 
 
@@ -61,9 +61,7 @@ class AIPlayer(Player):
 
         return self._find_near_move(board)
 
-    def _find_winning_move(
-        self, board: Board, player: int
-    ) -> Optional[Tuple[int, int]]:
+    def _find_winning_move(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
         for r, c in board.get_empty_cells():
             board.make_move(r, c, player)
             win = board.check_win(player)
@@ -83,11 +81,7 @@ class AIPlayer(Player):
                             if dr == 0 and dc == 0:
                                 continue
                             nr, nc = r + dr, c + dc
-                            if (
-                                0 <= nr < BOARD_SIZE
-                                and 0 <= nc < BOARD_SIZE
-                                and board.grid[nr, nc] == EMPTY
-                            ):
+                            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and board.grid[nr, nc] == EMPTY:
                                 candidates.add((nr, nc))
 
         if candidates:
@@ -96,9 +90,7 @@ class AIPlayer(Player):
         empties = board.get_empty_cells()
         return random.choice(empties) if empties else (0, 0)
 
-    def _get_scoring_candidates(
-        self, board: Board
-    ) -> List[Tuple[Tuple[int, int], int]]:
+    def _get_scoring_candidates(self, board: Board) -> List[Tuple[Tuple[int, int], int]]:
         candidates: List[Tuple[Tuple[int, int], int]] = []
         seen = set()
 
