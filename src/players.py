@@ -72,6 +72,8 @@ class HardStrategy(AIStrategy):
             return move
         if move := self._find_winning_move(board, opponent):
             return move
+        if move := self._find_double_open_four_threat(board, opponent):
+            return move
         candidates = self._get_scoring_candidates(board, symbol)
         if candidates:
             return max(candidates, key=lambda x: x[1])[0]
@@ -85,6 +87,41 @@ class HardStrategy(AIStrategy):
                 if win:
                     return (r, c)
         return None
+
+    def _find_double_open_four_threat(self, board: Board, player: int) -> Optional[Tuple[int, int]]:
+        threats = []
+        for r, c in board.get_empty_cells():
+            if board.make_move(r, c, player):
+                count = self._count_open_fours_after_fake_move(board, r, c, player)
+                board.undo_move(r, c)
+                if count >= 2:
+                    threats.append((r, c))
+        if threats:
+            return random.choice(threats)
+        return None
+
+    def _count_open_fours_after_fake_move(self, board: Board, r: int, c: int, symbol: int) -> int:
+        count = 0
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for dr, dc in directions:
+            stones = 1
+            open_ends = 0
+            for sign in (1, -1):
+                nr = r + dr * sign
+                nc = c + dc * sign
+                while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
+                    if board.grid[nr, nc] == symbol:
+                        stones += 1
+                    elif board.grid[nr, nc] == EMPTY:
+                        open_ends += 1
+                        break
+                    else:
+                        break
+                    nr += dr * sign
+                    nc += dc * sign
+            if stones == 4 and open_ends >= 2:
+                count += 1
+        return count
 
     def _find_near_move(self, board: Board) -> Tuple[int, int]:
         candidates = set()
@@ -110,8 +147,8 @@ class HardStrategy(AIStrategy):
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
                 if board.grid[r, c] != EMPTY:
-                    for dr in (-2, -1, 0, 1, 2):
-                        for dc in (-2, -1, 0, 1, 2):
+                    for dr in range(-3, 4):
+                        for dc in range(-3, 4):
                             if dr == 0 and dc == 0:
                                 continue
                             nr, nc = r + dr, c + dc
@@ -120,27 +157,22 @@ class HardStrategy(AIStrategy):
                                 score = self._evaluate_position(board, nr, nc, symbol)
                                 candidates.append(((nr, nc), score))
                                 seen.add((nr, nc))
-        return candidates
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        return candidates[:12]
 
     def _evaluate_position(self, board: Board, r: int, c: int, symbol: int) -> int:
         if not board.make_move(r, c, symbol):
             return -999999
-
         score = 0
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-
         for dr, dc in directions:
-            line_cells = [(r, c)]
             stones = 1
             open_ends = 0
-
             for sign in (1, -1):
                 nr, nc = r + dr * sign, c + dc * sign
-                consecutive = 0
                 while 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
                     if board.grid[nr, nc] == symbol:
-                        consecutive += 1
-                        line_cells.append((nr, nc))
+                        stones += 1
                     elif board.grid[nr, nc] == EMPTY:
                         open_ends += 1
                         break
@@ -148,23 +180,18 @@ class HardStrategy(AIStrategy):
                         break
                     nr += dr * sign
                     nc += dc * sign
-
-                stones += consecutive
-
             if stones >= 5:
-                score += 1_000_000
+                score += 1000000
             elif stones == 4:
-                score += 50_000 if open_ends >= 2 else 8_000
+                score += 50000 if open_ends >= 2 else 8000
             elif stones == 3:
-                score += 2_500 if open_ends >= 2 else 400
+                score += 2500 if open_ends >= 2 else 400
             elif stones == 2:
                 score += 180 if open_ends == 2 else 30
             elif stones == 1:
                 score += 10 if open_ends == 2 else 2
-
             if open_ends == 0 and stones >= 3:
                 score -= 3000
-
         board.undo_move(r, c)
         return score
 
