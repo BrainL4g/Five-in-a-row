@@ -1,7 +1,5 @@
 from __future__ import annotations
 import numpy as np
-import json
-import hashlib
 from typing import Tuple, Optional, List
 from src.constants import BOARD_SIZE, EMPTY
 
@@ -11,6 +9,7 @@ class Board:
         self.grid = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=np.int8)
         self.last_move = None
         self.win_line = None
+        self._near_cache = []
 
     def make_move(self, row: int, col: int, player: int) -> bool:
         if not (0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE):
@@ -19,12 +18,14 @@ class Board:
             return False
         self.grid[row, col] = player
         self.last_move = (row, col, player)
+        self._near_cache = []
         return True
 
     def undo_move(self, row: int, col: int) -> None:
         if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE and self.grid[row, col] != EMPTY:
             self.grid[row, col] = EMPTY
             self.win_line = None
+            self._near_cache = []
 
     def is_full(self) -> bool:
         return np.all(self.grid != EMPTY)
@@ -57,5 +58,22 @@ class Board:
     def get_empty_cells(self) -> List[Tuple[int, int]]:
         return [(r, c) for r in range(BOARD_SIZE) for c in range(BOARD_SIZE) if self.grid[r, c] == EMPTY]
 
-    def get_hash(self) -> str:
-        return hashlib.sha256(json.dumps(self.grid.tolist()).encode()).hexdigest()
+    def get_near_empty_cells(self) -> List[Tuple[int, int]]:
+        if self._near_cache:
+            return self._near_cache
+
+        seen = set()
+        for r in range(BOARD_SIZE):
+            for c in range(BOARD_SIZE):
+                if self.grid[r, c] != EMPTY:
+                    for dr in range(-2, 3):
+                        for dc in range(-2, 3):
+                            if dr == 0 and dc == 0:
+                                continue
+                            nr = r + dr
+                            nc = c + dc
+                            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and self.grid[nr, nc] == EMPTY:
+                                seen.add((nr, nc))
+
+        self._near_cache = list(seen)
+        return self._near_cache if self._near_cache else self.get_empty_cells()
