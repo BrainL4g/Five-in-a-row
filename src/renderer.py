@@ -94,21 +94,31 @@ class Renderer:
         text = self.font_btn.render(back_btn["text"], True, (255, 255, 255))
         self.screen.blit(text, (back_rect.centerx - text.get_width() // 2, back_rect.centery - text.get_height() // 2))
 
-    def draw_ui(self, status_text: str, difficulty: Difficulty, mouse_pos: Tuple[int, int], game_over: bool) -> None:
+    def draw_ui(self, status_text: str, difficulty: Difficulty, mouse_pos: Tuple[int, int], 
+                game_over: bool, can_undo: bool = False) -> None:
         y_base = GRID_OFFSET_Y + BOARD_SIZE * CELL_SIZE + 20
         status_surf = self.font_status.render(status_text, True, (30, 30, 30))
         self.screen.blit(status_surf, (GRID_OFFSET_X, y_base))
         diff_text = f"Сложность: {difficulty.name}"
         diff_surf = self.font_status.render(diff_text, True, (50, 50, 100))
         self.screen.blit(diff_surf, (WINDOW_WIDTH - diff_surf.get_width() - GRID_OFFSET_X, y_base))
-        btn_rect = pygame.Rect(WINDOW_WIDTH // 2 - 70, y_base + 50, 140, 40)
-        pygame.draw.rect(self.screen, (80, 120, 200), btn_rect, border_radius=6)
-        pygame.draw.rect(self.screen, (255, 255, 255), btn_rect, 2, border_radius=6)
+        
+        menu_btn_rect = pygame.Rect(WINDOW_WIDTH // 2 - 70, y_base + 50, 140, 40)
+        pygame.draw.rect(self.screen, (80, 120, 200), menu_btn_rect, border_radius=6)
+        pygame.draw.rect(self.screen, (255, 255, 255), menu_btn_rect, 2, border_radius=6)
         btn_text = self.font_btn.render("МЕНЮ", True, (255, 255, 255))
         self.screen.blit(btn_text,
-                         (btn_rect.centerx - btn_text.get_width() // 2, btn_rect.centery - btn_text.get_height() // 2))
-        if btn_rect.collidepoint(mouse_pos):
-            pygame.draw.rect(self.screen, (255, 255, 255, 80), btn_rect, 3, border_radius=6)
+                         (menu_btn_rect.centerx - btn_text.get_width() // 2, 
+                          menu_btn_rect.centery - btn_text.get_height() // 2))
+        
+        if can_undo:
+            undo_btn_rect = pygame.Rect(WINDOW_WIDTH // 2 - 70, y_base + 100, 140, 40)
+            pygame.draw.rect(self.screen, (150, 100, 80), undo_btn_rect, border_radius=6)
+            pygame.draw.rect(self.screen, (255, 255, 255), undo_btn_rect, 2, border_radius=6)
+            undo_text = self.font_btn.render("ОТМЕНА", True, (255, 255, 255))
+            self.screen.blit(undo_text,
+                             (undo_btn_rect.centerx - undo_text.get_width() // 2,
+                              undo_btn_rect.centery - undo_text.get_height() // 2))
 
     def update(self):
         pygame.display.flip()

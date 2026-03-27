@@ -8,6 +8,7 @@ from src.players import HumanPlayer, AIPlayer, HardStrategy
 from src.renderer import Renderer
 from src.menu import Menu
 from src.settings import Settings
+from src.sound import SoundManager
 
 
 class Game:
@@ -19,6 +20,7 @@ class Game:
         self.renderer.set_style(self.settings.get_style())
         self.human = HumanPlayer()
         self.ai = AIPlayer(AI_PLAYER, self.settings.get_difficulty())
+        self.sound = SoundManager()
         self.current_player = HUMAN
         self.game_over = False
         self.winner = None
@@ -45,6 +47,8 @@ class Game:
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.menu.state["active"]:
                         action = self.menu.handle_click(mouse_pos)
+                        if action:
+                            self.sound.play_click()
                         if action == "new_game":
                             self.reset_game()
                             self.menu.hide()
@@ -55,6 +59,8 @@ class Game:
                             running = False
                     elif self.settings.state["active"]:
                         action, _ = self.settings.handle_click(mouse_pos)
+                        if action:
+                            self.sound.play_click()
                         if action == "back":
                             self.settings.hide()
                             self.menu.show()
@@ -73,6 +79,12 @@ class Game:
                                                   140, 40)
                         if ui_btn_rect.collidepoint(mouse_pos):
                             self.menu.show()
+                        undo_btn_rect = pygame.Rect(WINDOW_WIDTH // 2 - 70,
+                                                    GRID_OFFSET_Y + BOARD_SIZE * CELL_SIZE + 100,
+                                                    140, 40)
+                        if undo_btn_rect.collidepoint(mouse_pos):
+                            if self.undo_move():
+                                self.sound.play_click()
             if not self.game_over and self.current_player == AI_PLAYER and not self.ai_thinking:
                 if current_time - last_move_time > AI_THINKING_DELAY:
                     self.ai_thinking = True
@@ -93,7 +105,8 @@ class Game:
                 self.renderer.draw_settings(self.settings.state)
             else:
                 status = self._get_status_text()
-                self.renderer.draw_ui(status, self.settings.get_difficulty(), mouse_pos, self.game_over)
+                self.renderer.draw_ui(status, self.settings.get_difficulty(), mouse_pos, self.game_over,
+                                  len(self.board.move_history) >= 2 and not self.game_over)
             self.renderer.update()
             pygame.time.delay(10)
         self.renderer.close()
@@ -109,16 +122,18 @@ class Game:
         return None
 
     def _after_move(self, player: int) -> None:
+        self.sound.play_move()
         if self.board.check_win(player):
             self.game_over = True
             self.winner = player
+            self.sound.play_win()
         elif self.board.is_full():
             self.game_over = True
             self.winner = None
         else:
             self.current_player = AI_PLAYER if player == HUMAN else HUMAN
 
-        if self.game_over and self.settings.get_difficulty() == Difficulty.HARD:
+        if self.game_over and self.winner is not None and self.settings.get_difficulty() == Difficulty.HARD:
             if isinstance(self.ai.strategy, HardStrategy):
                 self.ai.strategy.save_learning_data(self.moves, self.winner)
 
@@ -140,3 +155,13 @@ class Game:
         self.winner = None
         self.ai_thinking = False
         self.moves = []
+
+    def undo_move(self) -> bool:
+        if self.game_over or self.current_player == AI_PLAYER:
+            return False
+        if len(self.board.move_history) < 2:
+            return False
+        self.board.undo_moves(2)
+        if len(self.moves) >= 2:
+            self.moves = self.moves[:-2]
+        return True

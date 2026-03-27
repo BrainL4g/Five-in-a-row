@@ -9,9 +9,10 @@ import hashlib
 class Board:
     def __init__(self) -> None:
         self.grid = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=np.int8)
-        self.last_move = None
-        self.win_line = None
-        self._near_cache = []
+        self.last_move: Optional[Tuple[int, int, int]] = None
+        self.win_line: Optional[List[Tuple[int, int]]] = None
+        self._near_cache: List[Tuple[int, int]] = []
+        self.move_history: List[Tuple[int, int, int]] = []
 
     def make_move(self, row: int, col: int, player: int) -> bool:
         if not (0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE):
@@ -20,14 +21,30 @@ class Board:
             return False
         self.grid[row, col] = player
         self.last_move = (row, col, player)
+        self.move_history.append((row, col, player))
         self._near_cache = []
         return True
 
-    def undo_move(self, row: int, col: int) -> None:
-        if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE and self.grid[row, col] != EMPTY:
+    def undo_last_move(self) -> Optional[Tuple[int, int]]:
+        if not self.move_history:
+            return None
+        row, col, _ = self.move_history.pop()
+        if self.grid[row, col] != EMPTY:
             self.grid[row, col] = EMPTY
-            self.win_line = None
-            self._near_cache = []
+        self.win_line = None
+        self._near_cache = []
+        self.last_move = self.move_history[-1] if self.move_history else None
+        return (row, col)
+
+    def undo_moves(self, count: int) -> List[Tuple[int, int]]:
+        undone = []
+        for _ in range(count):
+            move = self.undo_last_move()
+            if move:
+                undone.append(move)
+            else:
+                break
+        return undone
 
     def is_full(self) -> bool:
         return np.all(self.grid != EMPTY)
