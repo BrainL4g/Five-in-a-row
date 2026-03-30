@@ -46,6 +46,21 @@ class Board:
                 break
         return undone
 
+    def undo_move(self, row: int, col: int) -> None:
+        if 0 <= row < BOARD_SIZE and 0 <= col < BOARD_SIZE and self.grid[row, col] != EMPTY:
+            self.grid[row, col] = EMPTY
+            idx_to_remove = None
+            for idx in range(len(self.move_history) - 1, -1, -1):
+                r, c, _p = self.move_history[idx]
+                if r == row and c == col:
+                    idx_to_remove = idx
+                    break
+            if idx_to_remove is not None:
+                self.move_history.pop(idx_to_remove)
+            self.last_move = self.move_history[-1] if self.move_history else None
+            self.win_line = None
+            self._near_cache = []
+
     def is_full(self) -> bool:
         return np.all(self.grid != EMPTY)
 

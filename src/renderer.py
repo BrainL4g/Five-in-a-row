@@ -95,7 +95,7 @@ class Renderer:
         self.screen.blit(text, (back_rect.centerx - text.get_width() // 2, back_rect.centery - text.get_height() // 2))
 
     def draw_ui(self, status_text: str, difficulty: Difficulty, mouse_pos: Tuple[int, int], 
-                game_over: bool, can_undo: bool = False) -> None:
+                game_over: bool) -> None:
         y_base = GRID_OFFSET_Y + BOARD_SIZE * CELL_SIZE + 20
         status_surf = self.font_status.render(status_text, True, (30, 30, 30))
         self.screen.blit(status_surf, (GRID_OFFSET_X, y_base))
@@ -111,14 +111,14 @@ class Renderer:
                          (menu_btn_rect.centerx - btn_text.get_width() // 2, 
                           menu_btn_rect.centery - btn_text.get_height() // 2))
         
-        if can_undo:
-            undo_btn_rect = pygame.Rect(WINDOW_WIDTH // 2 - 70, y_base + 100, 140, 40)
-            pygame.draw.rect(self.screen, (150, 100, 80), undo_btn_rect, border_radius=6)
-            pygame.draw.rect(self.screen, (255, 255, 255), undo_btn_rect, 2, border_radius=6)
-            undo_text = self.font_btn.render("ОТМЕНА", True, (255, 255, 255))
-            self.screen.blit(undo_text,
-                             (undo_btn_rect.centerx - undo_text.get_width() // 2,
-                              undo_btn_rect.centery - undo_text.get_height() // 2))
+        # Удалена кнопка отмены хода
+        if game_over:
+            rest_btn_rect = pygame.Rect(WINDOW_WIDTH // 2 - 70, y_base + 100, 140, 40)
+            pygame.draw.rect(self.screen, (60, 120, 60), rest_btn_rect, border_radius=6)
+            pygame.draw.rect(self.screen, (255, 255, 255), rest_btn_rect, 2, border_radius=6)
+            rest_text = self.font_btn.render("РЕСТАРТ", True, (255, 255, 255))
+            self.screen.blit(rest_text, (rest_btn_rect.centerx - rest_text.get_width() // 2,
+                                         rest_btn_rect.centery - rest_text.get_height() // 2))
 
     def update(self):
         pygame.display.flip()
