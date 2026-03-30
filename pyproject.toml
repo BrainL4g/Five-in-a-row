@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "five-in-a-row"
+version = "0.1.0"
+description = ""
+authors = ["Egor <ifbytopic@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+pygame = "^2.6.1"
+numpy = "^2.4.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
