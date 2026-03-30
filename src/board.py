@@ -62,7 +62,7 @@ class Board:
             self._near_cache = []
 
     def is_full(self) -> bool:
-        return np.all(self.grid != EMPTY)
+        return bool(np.all(self.grid != EMPTY))
 
     def check_win(self, player: int) -> bool:
         if self.last_move is None:
